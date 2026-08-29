@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>知识库管理</title>
+<style>
+  body{background:#15121c;color:#e8e3f0;font-family:"PingFang SC","Microsoft YaHei",sans-serif;max-width:860px;margin:0 auto;padding:16px;}
+  h1{color:#d4af37;font-size:20px;} .mini{color:#9a93b0;font-size:12px;}
+  .card{background:#241f30;border:1px solid #3a3350;border-radius:12px;padding:14px;margin-bottom:10px;}
+  .row{display:flex;justify-content:space-between;gap:10px;align-items:center;padding:8px 0;border-bottom:1px dashed #332b4a;}
+  input{background:#2c2540;color:#e8e3f0;border:1px solid #3a3350;border-radius:8px;padding:8px;font-size:14px;flex:1;}
+  .btn{background:#d4af37;color:#1a1420;border:none;border-radius:8px;padding:8px 14px;font-weight:bold;cursor:pointer;}
+  .btn.red{background:#e05252;color:#fff;padding:4px 10px;font-size:12px;}
+  .tag{background:#3a3350;border-radius:6px;padding:1px 8px;font-size:12px;}
+</style>
+</head>
+<body>
+<h1>📚 知识库管理</h1>
+<div class="mini">共 <b id="total">-</b> 条 ｜ 嵌入模式：<b id="mode">-</b></div>
+<div class="card" style="display:flex;gap:8px;">
+  <input id="q" placeholder="搜索词…" onkeydown="if(event.key==='Enter')search()">
+  <button class="btn" onclick="search()">搜索</button>
+  <button class="btn" onclick="list()">全部</button>
+</div>
+<div id="rows"></div>
+<script>
+var API=(new URLSearchParams(location.search).get("api")||"").replace(/\/$/,"");
+function call(action,payload){return fetch(API+"/api/plugin/astrbot_plugin_karol_trpg/lore",{method:"POST",
+ headers:{"Content-Type":"application/json"},body:JSON.stringify(Object.assign({action:action},payload))}).then(r=>r.json());}
+function show(rows){
+ document.getElementById("rows").innerHTML=rows.map(r=>"<div class='card'><div class='row'><span><b>"+r.title+"</b> <span class='tag'>"+r.kind+"</span> #"+r.id+"</span>"+
+  "<button class='btn red' onclick='del("+r.id+")'>删除</button></div><div class='mini'>"+(r.content||"")+"</div></div>").join("")||"<div class='mini'>无数据</div>";
+}
+function list(){call("list",{}).then(d=>{if(d.status==="ok"){document.getElementById("total").textContent=d.total;document.getElementById("mode").textContent=d.mode;show(d.rows);}});}
+function search(){var q=document.getElementById("q").value;call("search",{query:q}).then(d=>{if(d.status==="ok")show(d.hits);});}
+function del(id){if(!confirm("删除 #"+id+"？"))return;call("delete",{id:id}).then(()=>list());}
+list();
+</script>
+</body>
+</html>
