@@ -39,6 +39,10 @@
 </style>
 </head>
 <body>
+<div style="position:fixed;top:12px;right:12px;z-index:20;">
+  <button class="btn ghost" id="bgmBtn" onclick="toggleBgm()" title="背景音乐开关">🎵</button>
+</div>
+
 <div id="quiz" class="hidden">
   <h1 id="qtitle"></h1>
   <div class="card"><div class="intro" id="qintro"></div><div id="qopts"></div></div>
@@ -96,6 +100,23 @@ var API=(P.get("api")||"").replace(/\/$/,"");
 var LS="trpg_"+SESSION+"_"+PLAYER;
 var ATTRS=["力量","敏捷","体质","智力","感知","魅力"];
 var SLOTS=["武器","防具","饰品"];
+
+// ===== BGM =====
+// 音频文件放法与 game.html 同目录的 bgm.mp3，或改成任意在线 mp3 直链
+var BGM_SRC="bgm.mp3";
+var bgm=new Audio(BGM_SRC);bgm.loop=true;bgm.volume=0.35;
+var bgmOn=false;
+function toggleBgm(){
+ if(bgmOn){bgm.pause();bgmOn=false;}
+ else{bgm.play().then(()=>{bgmOn=true;}).catch(()=>{alert("播放失败：浏览器拦截或音频地址不可用（先点一下页面任意处再试）");});}
+ $("bgmBtn").textContent=bgmOn?"🔇":"🎵";
+}
+document.addEventListener("click",function(){
+ if(bgmOn||!bgm)return;
+ bgm.play().then(()=>{bgmOn=true;$("bgmBtn").textContent="🔇";}).catch(()=>{});
+},{once:true});
+// ===== BGM END =====
+
 var TRAITS={
  "力量":["莽撞的，铁拳的哥哥","重击",{"铁剑":1,"治疗药水":2},20],
  "敏捷":["眼疾手快的，风里的哥哥","潜行",{"短弓":1,"干粮":3},20],
@@ -152,15 +173,21 @@ function pick(i){
  state.attrs[o.attr]=Math.min(18,state.attrs[o.attr]+4);state.role=o.label;state.step++;
  if(state.step<3){renderQ();}else{renderAlloc();}
 }
-function renderAlloc(){$("quiz").classList.add("hidden");$("alloc").classList.remove("hidden");
+// 修复：alloc/reveal 是 quiz 的子元素，不能隐藏父容器，否则白屏
+function renderAlloc(){
+ $("qopts").innerHTML="";
+ $("qtitle").textContent="分配属性点数";
+ $("qintro").textContent="把剩下的 4 点加到你看重的属性上，然后确认你的词条。";
  $("freePt").textContent=state.free;
- $("allocList").innerHTML=ATTRS.map(a=>"<div class='row'><span>"+a+" <b>"+state.attrs[a]+"</b></span><button class='btn ghost' style='font-size:12px;padding:3px 8px;' onclick='allocAdd(\""+a+"\")'>+1</button></div>").join("");}
+ $("alloc").classList.remove("hidden");
+ $("allocList").innerHTML=ATTRS.map(a=>"<div class='row'><span>"+a+" <b>"+state.attrs[a]+"</b></span><button class='btn ghost' style='font-size:12px;padding:3px 8px;' onclick='allocAdd(\""+a+"\")'>+1</button></div>").join("");
+}
 function allocAdd(a){if(state.free<=0)return alert("没有剩余点数");if(state.attrs[a]>=18)return alert("已达上限18");state.attrs[a]++;state.free--;renderAlloc();}
 function allocDone(){
  var dom=ATTRS.reduce((x,a)=>state.attrs[a]>x?state.attrs[a]:x,0);
  var main=ATTRS.find(a=>state.attrs[a]===dom);
  var t=TRAITS[main];state.trait=t[0];state.skill=t[1];state.items=Object.assign({},t[2]);state.gold=t[3]||20;
- $("quiz").classList.remove("hidden");$("alloc").classList.add("hidden");
+ $("alloc").classList.add("hidden");
  $("qtitle").textContent="词条揭晓";$("qintro").textContent="三杯酒下肚，老板娘忽然盯着你看了很久，笑了：";
  $("qopts").innerHTML="";
  $("traitBig").textContent="「"+state.trait+"」";
