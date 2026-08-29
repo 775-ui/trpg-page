@@ -29,7 +29,7 @@
   .row{display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px dashed #332b4a;font-size:14px;gap:8px;}
   .row:last-child{border-bottom:none;}
   .mini{font-size:12px;color:#9a93b0;}
-  .pending{position:fixed;bottom:16px;right:16px;background:var(--card);border:1px solid var(--gold);border-radius:12px;padding:10px 14px;font-size:13px;z-index:9;max-width:320px;}
+  .pending{position:fixed;bottom:16px;right:16px;background:var(--card);border:1px solid var(--gold);border-radius:12px;padding:10px 14px;font-size:13px;z-index:9;max-width:320px;cursor:grab;touch-action:none;}
   .dice{font-size:42px;text-align:center;color:var(--gold);margin:8px 0;}
   .big{font-size:22px;font-weight:bold;}
   .ok{color:var(--green);} .bad{color:var(--red);} .epic{color:var(--gold);}
@@ -88,9 +88,12 @@
 </div>
 
 <div id="pending" class="pending hidden">
-  <b>待结算 <span id="pendingN">0</span> 条</b><br>
+  <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;">
+    <b>待结算 <span id="pendingN">0</span> 条</b>
+    <button class="btn ghost" id="pendToggle" style="font-size:11px;padding:2px 8px;" onclick="togglePending()">收起</button>
+  </div>
   <div id="pendingList" style="font-size:11px;color:#9a93b0;max-height:120px;overflow:auto;margin:4px 0;"></div>
-  <button class="btn" style="font-size:13px;padding:6px 12px;" onclick="settle()">结算（同步给主模型）</button>
+  <button class="btn" id="pendSettle" style="font-size:13px;padding:6px 12px;" onclick="settle()">结算（同步给主模型）</button>
 </div>
 
 <script>
@@ -101,8 +104,19 @@ var LS="trpg_"+SESSION+"_"+PLAYER;
 var ATTRS=["力量","敏捷","体质","智力","感知","魅力"];
 var SLOTS=["武器","防具","饰品"];
 
+// ===== 内置物品表兜底（网络不通也知道装备类型，防止铁剑被当消耗品"使用"） =====
+var KNOWN_ITEMS={
+ "铁剑":{"type":"武器","price":30,"effect":""},
+ "短弓":{"type":"武器","price":45,"effect":""},
+ "铁盾":{"type":"防具","price":25,"effect":"格挡率+10%"},
+ "治疗药水":{"type":"消耗品","price":20,"effect":"回复15HP"},
+ "法力药水":{"type":"消耗品","price":20,"effect":"回复15MP"},
+ "干粮":{"type":"消耗品","price":5,"effect":"回复5HP"},
+ "圣水":{"type":"消耗品","price":30,"effect":"对不死系10点伤害"},
+ "魔法卷轴":{"type":"消耗品","price":35,"effect":"火球术8点伤害"}};
+
 // ===== BGM =====
-// 音频文件放法与 game.html 同目录的 bgm.mp3，或改成任意在线 mp3 直链
+// 改成你的在线mp3直链（如 https://775-ui.github.io/trpg-page/bgm.mp3）
 var BGM_SRC="bgm.mp3";
 var bgm=new Audio(BGM_SRC);bgm.loop=true;bgm.volume=0.35;
 var bgmOn=false;
@@ -115,7 +129,30 @@ document.addEventListener("click",function(){
  if(bgmOn||!bgm)return;
  bgm.play().then(()=>{bgmOn=true;$("bgmBtn").textContent="🔇";}).catch(()=>{});
 },{once:true});
-// ===== BGM END =====
+
+// ===== 结算面板：可拖动 + 可收起 =====
+var pendCollapsed=false;
+function togglePending(){
+ pendCollapsed=!pendCollapsed;
+ $("pendingList").classList.toggle("hidden",pendCollapsed);
+ $("pendSettle").classList.toggle("hidden",pendCollapsed);
+ $("pendToggle").textContent=pendCollapsed?"展开":"收起";
+}
+(function(){
+ var box=$("pending"),down=false,offX=0,offY=0;
+ box.addEventListener("pointerdown",function(e){
+  if(e.target.tagName==="BUTTON")return;
+  down=true;offX=e.clientX-box.offsetLeft;offY=e.clientY-box.offsetTop;
+  box.style.bottom="auto";box.style.right="auto";
+  box.style.left=box.offsetLeft+"px";box.style.top=box.offsetTop+"px";
+  box.setPointerCapture(e.pointerId);
+ });
+ box.addEventListener("pointermove",function(e){
+  if(!down)return;
+  box.style.left=(e.clientX-offX)+"px";box.style.top=(e.clientY-offY)+"px";
+ });
+ box.addEventListener("pointerup",function(){down=false;});
+})();
 
 var TRAITS={
  "力量":["莽撞的，铁拳的哥哥","重击",{"铁剑":1,"治疗药水":2},20],
@@ -125,19 +162,19 @@ var TRAITS={
  "感知":["温柔敏锐的，听心的哥哥","治疗术",{"圣水":1,"治疗药水":2},20],
  "魅力":["能说会道的，请客的哥哥","鼓舞",{"干粮":2},50]};
 var ROUNDS=[
- {title:"你从哪里来",intro:"风雪灌进你的衣领，远处的灯火像碎掉的金币。旅店老板娘把热汤推到你面前——外乡人，你打哪儿来？",
+ {title:"哥哥……你从哪里来",intro:"风雪灌进你的衣领，远处的灯火像碎掉的金币。爱丽丝把热汤推到你面前——『格林』，你还记得你是谁吗？？",
   options:[
    {label:"猎人村落",attr:"力量",flavor:"雪地上追过白兔，也追过狼。弓是你的第二双手，猎物教会你：先动眼，再动手。"},
    {label:"法师学院",attr:"智力",flavor:"你背过的咒语比交过的朋友还多。毕业那天教授说：知识不会让你免死，只会让你死得明白些。"},
    {label:"教会孤儿院",attr:"感知",flavor:"你替老修士跑腿十年，学会了从咳嗽声里听出谎言。神没给你圣光，但给了你一双好耳朵。"},
    {label:"商队大篷车",attr:"魅力",flavor:"你在讨价还价声里长大，嘴皮子比钱袋子还鼓。骗子见你绕道，债主见你叹气。"}]},
- {title:"你是哪种人",intro:"老板娘眯起眼打量你：……那你又是块什么料子？",
+ {title:"你是哪种人",intro:"爱丽丝眯起眼打量你：……你还记得你的特长吗？",
   options:[
    {label:"莽撞的",attr:"力量",flavor:"'先打了再说'是你的人生格言，伤疤是你攒下的勋章。"},
    {label:"眼疾手快的",attr:"敏捷",flavor:"杯子落地前你能接住三次。别人数到三的时候，你已经跑出两条街。"},
    {label:"皮实扛打的",attr:"体质",flavor:"挨揍是门学问，你拿到了博士学位。痛是暂时的，躺平是永恒的。"},
    {label:"温柔坚韧的",attr:"感知",flavor:"再难堪的场面，你也能先稳住自己，再去扶别人一把。"}]},
- {title:"你最常做的事",intro:"说归说，那你平时都靠什么混饭吃？",
+ {title:"你最常做的事",intro:"这样啊……格林先生您的爱好呢？",
   options:[
    {label:"山林里讨生活",attr:"敏捷",flavor:"陷阱、攀爬、悄无声息地靠近——你比猎物更熟悉风的方向。"},
    {label:"码头扛大包",attr:"体质",flavor:"肩膀上的茧比鞋底厚，一天三顿干饭，一身腱子肉。"},
@@ -220,6 +257,8 @@ function tab(name){
 function itemType(n){
  var m=state.itemMeta&&state.itemMeta[n];
  if(m&&m.type)return m.type;
+ var k=KNOWN_ITEMS[n];
+ if(k)return k.type;
  return (state.itemTypes&&state.itemTypes[n])||"消耗品";
 }
 function renderAttr(){
@@ -227,7 +266,7 @@ function renderAttr(){
  var eq=SLOTS.map(slot=>{
   var e=(c.equipped||{})[slot]||{};
   if(e.name){
-   var meta=state.itemMeta[e.name]||{};
+   var meta=state.itemMeta[e.name]||KNOWN_ITEMS[e.name]||{};
    var bonus=meta.effect?("<span class='mini'> "+meta.effect+"</span>"):"";
    return "<div class='row'><span>"+slot+"：<b class='epic'>"+e.name+"</b>"+bonus+"</span>"+
     "<button class='btn ghost' style='font-size:12px;padding:3px 8px;' onclick='unequipItem(\""+slot+"\")'>卸下</button></div>";
@@ -247,7 +286,7 @@ function renderBag(){
  var c=state.char;var inv=c.inventory||{};
  $("panel-bag").innerHTML=Object.keys(inv).length?
   Object.keys(inv).map(k=>{
-   var t=itemType(k);var meta=state.itemMeta[k]||{};
+   var t=itemType(k);var meta=state.itemMeta[k]||KNOWN_ITEMS[k]||{};
    var btns="";
    if(t==="武器"||t==="防具"||t==="饰品")btns+="<button class='btn ghost' style='font-size:12px;padding:3px 8px;' onclick='equipItem(\""+k+"\")'>装备</button> ";
    if(t==="消耗品")btns+="<button class='btn ghost' style='font-size:12px;padding:3px 8px;' onclick='useItem(\""+k+"\")'>使用</button> ";
@@ -285,12 +324,16 @@ function unequipItem(slot){
  c.inventory[e.name]=(c.inventory[e.name]||0)+1;
  save();renderBag();renderAttr();
 }
-function useItem(k){state.ops.push("使用 "+k+"x1");opLocal(k,-1);}
+function useItem(k){
+ var t=itemType(k);
+ if(t==="武器"||t==="防具"||t==="饰品")return alert("「"+k+"」是装备，请用「装备」按钮装配到对应槽位");
+ state.ops.push("使用 "+k+"x1");opLocal(k,-1);
+}
 function sellItem(k){
  var c=state.char;if(!c.inventory[k]||c.inventory[k]<=0)return;
  state.ops.push("卖出 "+k+"x1");
  c.inventory[k]-=1;if(c.inventory[k]<=0)delete c.inventory[k];
- var meta=state.itemMeta[k]||{};
+ var meta=state.itemMeta[k]||KNOWN_ITEMS[k]||{};
  var p=meta.sell_price?meta.sell_price:(meta.price?Math.floor(meta.price/2):1);
  c.gold=(c.gold||0)+Math.max(1,p);
  save();renderBag();renderAttr();
