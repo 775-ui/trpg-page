@@ -1,0 +1,379 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>TRPG面板</title>
+<style>
+  :root{--bg:#15121c;--card:#241f30;--line:#3a3350;--gold:#d4af37;--red:#e05252;--green:#6fd08c;}
+  *{box-sizing:border-box;margin:0;padding:0;}
+  body{background:var(--bg);color:#e8e3f0;font-family:"PingFang SC","Microsoft YaHei",sans-serif;min-height:100vh;padding:16px;max-width:900px;margin:0 auto;}
+  .hidden{display:none!important;}
+  h1{color:var(--gold);font-size:20px;margin-bottom:4px;letter-spacing:2px;}
+  .sub{color:#9a93b0;font-size:12px;margin-bottom:14px;}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:16px;margin-bottom:12px;}
+  .intro{font-style:italic;color:#c9c2dd;margin-bottom:12px;line-height:1.6;}
+  .opt{display:block;width:100%;text-align:left;background:#2c2540;color:#e8e3f0;border:1px solid var(--line);border-radius:10px;padding:10px 12px;margin-bottom:8px;cursor:pointer;font-size:14px;line-height:1.5;}
+  .opt:hover{border-color:var(--gold);}
+  .opt b{color:var(--gold);}
+  .tag{display:inline-block;background:#3a3350;border-radius:6px;padding:1px 8px;font-size:12px;margin-left:6px;color:#b9b1d0;}
+  .btn{background:var(--gold);color:#1a1420;border:none;border-radius:10px;padding:10px 18px;font-size:15px;font-weight:bold;cursor:pointer;}
+  .btn.ghost{background:transparent;color:var(--gold);border:1px solid var(--gold);}
+  .btn.red{background:var(--red);color:#fff;}
+  .tab{display:inline-block;padding:8px 14px;cursor:pointer;border-radius:8px 8px 0 0;font-size:14px;color:#9a93b0;}
+  .tab.on{background:var(--card);color:var(--gold);border:1px solid var(--line);border-bottom:none;}
+  .tabs{border-bottom:1px solid var(--line);margin-bottom:12px;}
+  .bar{height:14px;background:#2c2540;border-radius:7px;overflow:hidden;margin:4px 0 10px;}
+  .bar i{display:block;height:100%;background:var(--green);}
+  .bar.hp i{background:var(--red);}
+  .row{display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px dashed #332b4a;font-size:14px;gap:8px;}
+  .row:last-child{border-bottom:none;}
+  .mini{font-size:12px;color:#9a93b0;}
+  .pending{position:fixed;bottom:16px;right:16px;background:var(--card);border:1px solid var(--gold);border-radius:12px;padding:10px 14px;font-size:13px;z-index:9;max-width:320px;}
+  .dice{font-size:42px;text-align:center;color:var(--gold);margin:8px 0;}
+  .big{font-size:22px;font-weight:bold;}
+  .ok{color:var(--green);} .bad{color:var(--red);} .epic{color:var(--gold);}
+  .combatBanner{background:#3a1020;border:1px solid var(--red);border-radius:10px;padding:10px 14px;margin-bottom:12px;color:#ffd7d7;}
+  canvas{width:100%;border-radius:8px;}
+  select,input{background:#2c2540;color:#e8e3f0;border:1px solid var(--line);border-radius:8px;padding:8px;font-size:14px;}
+</style>
+</head>
+<body>
+<div id="quiz" class="hidden">
+  <h1 id="qtitle"></h1>
+  <div class="card"><div class="intro" id="qintro"></div><div id="qopts"></div></div>
+  <div id="alloc" class="card hidden">
+    <div class="intro">还有 <b id="freePt">4</b> 点自由分配（单项上限18）</div>
+    <div id="allocList"></div>
+    <button class="btn" onclick="allocDone()">分配完毕</button>
+  </div>
+  <div id="reveal" class="card hidden">
+    <div class="intro">"……我大概看明白你了。"</div>
+    <div id="traitBig" class="big epic" style="text-align:center;margin:10px 0;"></div>
+    <div id="revealDetail" class="mini" style="text-align:center;line-height:1.8;"></div>
+    <div style="text-align:center;margin-top:14px;"><button class="btn" onclick="finishCreate()">出发！</button></div>
+  </div>
+</div>
+
+<div id="main" class="hidden">
+  <h1>TRPG 面板</h1>
+  <div class="sub" id="metaBar"></div>
+  <div id="combatBanner" class="combatBanner hidden"></div>
+  <div class="tabs">
+    <span class="tab on" data-tab="attr" onclick="tab('attr')">属性</span>
+    <span class="tab" data-tab="bag" onclick="tab('bag')">背包</span>
+    <span class="tab" data-tab="shop" onclick="tab('shop')">商店</span>
+    <span class="tab" data-tab="party" onclick="tab('party')">队友</span>
+    <span class="tab" data-tab="hist" onclick="tab('hist')">历史</span>
+    <span class="tab" data-tab="dice" onclick="tab('dice')">判定</span>
+    <span class="tab" data-tab="map" onclick="tab('map')">地图</span>
+    <span class="tab" data-tab="task" onclick="tab('task')">任务</span>
+  </div>
+  <div id="panel-attr" class="card"></div>
+  <div id="panel-bag" class="card hidden"></div>
+  <div id="panel-shop" class="card hidden"></div>
+  <div id="panel-party" class="card hidden"></div>
+  <div id="panel-hist" class="card hidden"></div>
+  <div id="panel-dice" class="card hidden"></div>
+  <div id="panel-map" class="card hidden"></div>
+  <div id="panel-task" class="card hidden"></div>
+  <div style="margin-top:12px;">
+    <button class="btn ghost" onclick="recreate()">重新创建角色</button>
+    <button class="btn red" onclick="restartGame()">重新开始（全队重置）</button>
+  </div>
+</div>
+
+<div id="pending" class="pending hidden">
+  <b>待结算 <span id="pendingN">0</span> 条</b><br>
+  <div id="pendingList" style="font-size:11px;color:#9a93b0;max-height:120px;overflow:auto;margin:4px 0;"></div>
+  <button class="btn" style="font-size:13px;padding:6px 12px;" onclick="settle()">结算（同步给主模型）</button>
+</div>
+
+<script>
+var P=new URLSearchParams(location.search);
+var SESSION=P.get("session")||"";var PLAYER=P.get("player")||"";var TOKEN=P.get("token")||"";
+var API=(P.get("api")||"").replace(/\/$/,"");
+var LS="trpg_"+SESSION+"_"+PLAYER;
+var ATTRS=["力量","敏捷","体质","智力","感知","魅力"];
+var SLOTS=["武器","防具","饰品"];
+var TRAITS={
+ "力量":["莽撞的，铁拳的哥哥","重击",{"铁剑":1,"治疗药水":2},20],
+ "敏捷":["眼疾手快的，风里的哥哥","潜行",{"短弓":1,"干粮":3},20],
+ "体质":["皮实扛打的，不倒的哥哥","守护",{"铁盾":1,"治疗药水":3},20],
+ "智力":["博学的，藏书的哥哥","火球术",{"法力药水":2,"魔法卷轴":1},20],
+ "感知":["温柔敏锐的，听心的哥哥","治疗术",{"圣水":1,"治疗药水":2},20],
+ "魅力":["能说会道的，请客的哥哥","鼓舞",{"干粮":2},50]};
+var ROUNDS=[
+ {title:"你从哪里来",intro:"风雪灌进你的衣领，远处的灯火像碎掉的金币。旅店老板娘把热汤推到你面前——外乡人，你打哪儿来？",
+  options:[
+   {label:"猎人村落",attr:"力量",flavor:"雪地上追过白兔，也追过狼。弓是你的第二双手，猎物教会你：先动眼，再动手。"},
+   {label:"法师学院",attr:"智力",flavor:"你背过的咒语比交过的朋友还多。毕业那天教授说：知识不会让你免死，只会让你死得明白些。"},
+   {label:"教会孤儿院",attr:"感知",flavor:"你替老修士跑腿十年，学会了从咳嗽声里听出谎言。神没给你圣光，但给了你一双好耳朵。"},
+   {label:"商队大篷车",attr:"魅力",flavor:"你在讨价还价声里长大，嘴皮子比钱袋子还鼓。骗子见你绕道，债主见你叹气。"}]},
+ {title:"你是哪种人",intro:"老板娘眯起眼打量你：……那你又是块什么料子？",
+  options:[
+   {label:"莽撞的",attr:"力量",flavor:"'先打了再说'是你的人生格言，伤疤是你攒下的勋章。"},
+   {label:"眼疾手快的",attr:"敏捷",flavor:"杯子落地前你能接住三次。别人数到三的时候，你已经跑出两条街。"},
+   {label:"皮实扛打的",attr:"体质",flavor:"挨揍是门学问，你拿到了博士学位。痛是暂时的，躺平是永恒的。"},
+   {label:"温柔坚韧的",attr:"感知",flavor:"再难堪的场面，你也能先稳住自己，再去扶别人一把。"}]},
+ {title:"你最常做的事",intro:"说归说，那你平时都靠什么混饭吃？",
+  options:[
+   {label:"山林里讨生活",attr:"敏捷",flavor:"陷阱、攀爬、悄无声息地靠近——你比猎物更熟悉风的方向。"},
+   {label:"码头扛大包",attr:"体质",flavor:"肩膀上的茧比鞋底厚，一天三顿干饭，一身腱子肉。"},
+   {label:"灯下翻旧书",attr:"智力",flavor:"从卷宗到禁书，你什么字都敢看，也真看得懂。"},
+   {label:"替人排忧解难",attr:"魅力",flavor:"东家丢鸡、西家闹鬼，最后都来敲你的门。人情是最硬的货币。"}]}];
+
+var state={attrs:{},free:4,step:0,ops:[],role:"",me:null,server:null,char:null,
+           gold:0,itemTypes:{},shop:[],itemMeta:{}};
+function $(id){return document.getElementById(id);}
+function renderPending(){
+ var n=state.ops.length;
+ $("pendingN").textContent=n;
+ $("pending").classList.toggle("hidden",n===0);
+ $("pendingList").innerHTML=state.ops.slice(-8).map(o=>"<div>"+o+"</div>").join("");
+}
+function save(){localStorage.setItem(LS,JSON.stringify({char:state.char,ops:state.ops}));renderPending();}
+function load(){try{var d=JSON.parse(localStorage.getItem(LS));if(d){state.char=d.char;state.ops=d.ops||[];}}catch(e){}}
+function boot(){
+ if(!SESSION||!PLAYER||!TOKEN){document.body.innerHTML="<h1>链接无效</h1><div class='sub'>请通过机器人发送的个人链接打开本页面</div>";return;}
+ load();
+ if(state.char){showMain();}else{startQuiz();}
+}
+function startQuiz(){state.attrs={};ATTRS.forEach(a=>state.attrs[a]=10);state.free=4;state.step=0;state.role="";
+ $("main").classList.add("hidden");$("quiz").classList.remove("hidden");renderQ();}
+function renderQ(){
+ var r=ROUNDS[state.step];$("qtitle").textContent="第"+(state.step+1)+"轮 · "+r.title;$("qintro").textContent=r.intro;
+ $("qopts").innerHTML=r.options.map((o,i)=>"<button class='opt' onclick='pick("+i+")'><b>"+o.label+"</b><span class='tag'>"+o.attr+"+4</span><br><span class='mini'>"+o.flavor+"</span></button>").join("");
+ $("alloc").classList.add("hidden");$("reveal").classList.add("hidden");
+}
+function pick(i){
+ var o=ROUNDS[state.step].options[i];
+ if(state.attrs[o.attr]>=18)return alert("该属性已达上限18");
+ state.attrs[o.attr]=Math.min(18,state.attrs[o.attr]+4);state.role=o.label;state.step++;
+ if(state.step<3){renderQ();}else{renderAlloc();}
+}
+function renderAlloc(){$("quiz").classList.add("hidden");$("alloc").classList.remove("hidden");
+ $("freePt").textContent=state.free;
+ $("allocList").innerHTML=ATTRS.map(a=>"<div class='row'><span>"+a+" <b>"+state.attrs[a]+"</b></span><button class='btn ghost' style='font-size:12px;padding:3px 8px;' onclick='allocAdd(\""+a+"\")'>+1</button></div>").join("");}
+function allocAdd(a){if(state.free<=0)return alert("没有剩余点数");if(state.attrs[a]>=18)return alert("已达上限18");state.attrs[a]++;state.free--;renderAlloc();}
+function allocDone(){
+ var dom=ATTRS.reduce((x,a)=>state.attrs[a]>x?state.attrs[a]:x,0);
+ var main=ATTRS.find(a=>state.attrs[a]===dom);
+ var t=TRAITS[main];state.trait=t[0];state.skill=t[1];state.items=Object.assign({},t[2]);state.gold=t[3]||20;
+ $("quiz").classList.remove("hidden");$("alloc").classList.add("hidden");
+ $("qtitle").textContent="词条揭晓";$("qintro").textContent="三杯酒下肚，老板娘忽然盯着你看了很久，笑了：";
+ $("qopts").innerHTML="";
+ $("traitBig").textContent="「"+state.trait+"」";
+ $("revealDetail").innerHTML="技能：<b class='epic'>"+state.skill+"</b><br>初始物品："+Object.keys(state.items).map(k=>k+"x"+state.items[k]).join("、")+
+  "<br>初始金币：<b class='epic'>"+state.gold+"</b> 铜币<br><span class='mini'>属性："+ATTRS.map(a=>a+" "+state.attrs[a]).join(" / ")+"</span>";
+ $("reveal").classList.remove("hidden");
+}
+function finishCreate(){
+ var inv=Object.assign({},state.items);
+ state.char={name:PLAYER,trait:state.trait,role:state.role,attributes:state.attrs,
+  skills:[state.skill],inventory:inv,hp:20,max_hp:20,mp:5,max_mp:5,status:"健康",
+  gold:state.gold,equipped:{"武器":{},"防具":{},"饰品":{}}};
+ state.ops.push("create "+JSON.stringify({trait:state.trait,role:state.role,attributes:state.attrs,
+  skills:[state.skill],inventory:inv,hp:20,max_hp:20,mp:5,max_mp:5,gold:state.gold}));
+ save();showMain();
+}
+function showMain(){
+ $("quiz").classList.add("hidden");$("main").classList.remove("hidden");
+ renderAttr();tab("attr");refreshServer();renderPending();
+}
+function tab(name){
+ document.querySelectorAll(".tab").forEach(t=>t.classList.remove("on"));
+ var el=document.querySelector('.tab[data-tab="'+name+'"]');
+ if(el)el.classList.add("on");
+ ["attr","bag","shop","party","hist","dice","map","task"].forEach(n=>$("panel-"+n).classList.add("hidden"));
+ $("panel-"+name).classList.remove("hidden");
+ if(name==="bag")renderBag();if(name==="shop")renderShop();if(name==="party")renderParty();
+ if(name==="hist")renderHist();if(name==="map")renderMap();if(name==="task")renderTask();if(name==="dice")renderDice();
+}
+function itemType(n){
+ var m=state.itemMeta&&state.itemMeta[n];
+ if(m&&m.type)return m.type;
+ return (state.itemTypes&&state.itemTypes[n])||"消耗品";
+}
+function renderAttr(){
+ var c=state.char;var hpPct=Math.round(c.hp/c.max_hp*100);
+ var eq=SLOTS.map(slot=>{
+  var e=(c.equipped||{})[slot]||{};
+  if(e.name){
+   var meta=state.itemMeta[e.name]||{};
+   var bonus=meta.effect?("<span class='mini'> "+meta.effect+"</span>"):"";
+   return "<div class='row'><span>"+slot+"：<b class='epic'>"+e.name+"</b>"+bonus+"</span>"+
+    "<button class='btn ghost' style='font-size:12px;padding:3px 8px;' onclick='unequipItem(\""+slot+"\")'>卸下</button></div>";
+  }
+  return "<div class='row'><span>"+slot+"</span><span class='mini'>未装备</span></div>";
+ }).join("");
+ $("panel-attr").innerHTML=
+  "<div class='row'><span><b>"+c.name+"</b> <span class='mini'>"+c.trait+"</span></span><span class='tag'>"+c.role+"</span></div>"+
+  "<div class='row'><span>金币</span><span class='epic big'>"+(c.gold||0)+" 铜币</span></div>"+
+  "<div class='row'><span>HP</span><span>"+c.hp+"/"+c.max_hp+"</span></div><div class='bar hp'><i style='width:"+hpPct+"%'></i></div>"+
+  "<div class='row'><span>法力</span><span>"+c.mp+"/"+c.max_mp+"</span></div><div class='bar'><i style='width:"+(c.mp/c.max_mp*100)+"%'></i></div>"+
+  ATTRS.map(a=>"<div class='row'><span>"+a+"</span><span><b>"+c.attributes[a]+"</b> <span class='mini'>(+"+(c.attributes[a]-10)+")</span></span></div>").join("")+
+  "<div class='row'><span>技能</span><span>"+((c.skills||[]).join("、")||"无")+"</span></div>"+
+  "<div class='row'><span>装备</span><span class='mini'></span></div>"+eq;
+}
+function renderBag(){
+ var c=state.char;var inv=c.inventory||{};
+ $("panel-bag").innerHTML=Object.keys(inv).length?
+  Object.keys(inv).map(k=>{
+   var t=itemType(k);var meta=state.itemMeta[k]||{};
+   var btns="";
+   if(t==="武器"||t==="防具"||t==="饰品")btns+="<button class='btn ghost' style='font-size:12px;padding:3px 8px;' onclick='equipItem(\""+k+"\")'>装备</button> ";
+   if(t==="消耗品")btns+="<button class='btn ghost' style='font-size:12px;padding:3px 8px;' onclick='useItem(\""+k+"\")'>使用</button> ";
+   btns+="<button class='btn ghost' style='font-size:12px;padding:3px 8px;' onclick='sellItem(\""+k+"\")'>卖出</button>";
+   var info=(meta.effect?("<span class='mini'>"+meta.effect+"</span>"):"");
+   var sellTip=(meta.sell_price?("<span class='mini'> 售价"+meta.sell_price+"</span>"):"");
+   return "<div class='row'><span>"+k+"<span class='tag'>"+t+"</span><span class='tag'>x"+inv[k]+"</span><br>"+info+sellTip+"</span><span>"+btns+"</span></div>";
+  }).join("")
+  :"<div class='mini'>背包空空如也</div>";
+}
+function renderShop(){
+ var s=state.server;var shop=state.shop||[];
+ $("panel-shop").innerHTML="<div class='row'><span>商店 @ "+(s&&s.location?("「"+s.location+"」"):"未知")+"</span><span class='epic'>金币 "+(state.char.gold||0)+"</span></div>"+
+  (shop.length?shop.map(it=>"<div class='row'><span><b>"+it.name+"</b><span class='tag'>"+it.type+"</span><span class='tag'>"+it.quality+"</span><br>"+
+   "<span class='mini'>"+(it.effect||"")+" 攻"+it.attack+" 防"+it.defense+"</span></span>"+
+   "<span class='epic'>"+it.price+"铜币</span><button class='btn ghost' style='font-size:12px;padding:3px 8px;' onclick='buyItem(\""+it.name+"\")'>购买</button></div>").join("")
+  :"<div class='mini'>该地暂无商品</div>");
+}
+function equipItem(k){
+ var c=state.char;var t=itemType(k);
+ if(t!=="武器"&&t!=="防具"&&t!=="饰品")return alert("该物品不可装备");
+ if(!c.inventory[k]||c.inventory[k]<=0)return;
+ state.ops.push("装备 "+k);
+ c.inventory[k]-=1;if(c.inventory[k]<=0)delete c.inventory[k];
+ var old=(c.equipped[t]||{}).name;
+ if(old)c.inventory[old]=(c.inventory[old]||0)+1;
+ c.equipped[t]={name:k};
+ save();renderBag();renderAttr();
+}
+function unequipItem(slot){
+ var c=state.char;var e=(c.equipped||{})[slot]||{};
+ if(!e.name)return;
+ state.ops.push("卸下 "+slot);
+ c.equipped[slot]={};
+ c.inventory[e.name]=(c.inventory[e.name]||0)+1;
+ save();renderBag();renderAttr();
+}
+function useItem(k){state.ops.push("使用 "+k+"x1");opLocal(k,-1);}
+function sellItem(k){
+ var c=state.char;if(!c.inventory[k]||c.inventory[k]<=0)return;
+ state.ops.push("卖出 "+k+"x1");
+ c.inventory[k]-=1;if(c.inventory[k]<=0)delete c.inventory[k];
+ var meta=state.itemMeta[k]||{};
+ var p=meta.sell_price?meta.sell_price:(meta.price?Math.floor(meta.price/2):1);
+ c.gold=(c.gold||0)+Math.max(1,p);
+ save();renderBag();renderAttr();
+}
+function buyItem(name){
+ var it=(state.shop||[]).find(x=>x.name===name);if(!it)return;
+ var c=state.char;
+ if((c.gold||0)<it.price)return alert("金币不足");
+ state.ops.push("购买 "+name+"x1");
+ c.gold=(c.gold||0)-it.price;
+ c.inventory[name]=(c.inventory[name]||0)+1;
+ save();renderShop();renderBag();renderAttr();
+}
+function opLocal(k,d){var c=state.char;c.inventory[k]=(c.inventory[k]||0)+d;if(c.inventory[k]<=0)delete c.inventory[k];save();renderBag();}
+function renderParty(){
+ var s=state.server;if(!s)return $("panel-party").innerHTML="<div class='mini'>拉取队伍数据中……</div>";
+ var aff=s.affinity||{};
+ $("panel-party").innerHTML=s.players.map(p=>{
+  var me=p.pid===PLAYER;
+  return "<div class='row'><span>"+(me?"<b>◆</b> ":"")+p.name+" <span class='mini'>"+p.trait+"</span></span>"+
+   "<span class='mini'>HP "+p.hp+"/"+p.max_hp+" ｜ 金币 "+(p.gold||0)+" ｜ "+p.status+(me?"（我）":"")+"</span></div>";}).join("")+
+  (Object.keys(aff).length?"<div class='row'><span>好感</span><span class='mini'>"+Object.keys(aff).map(k=>k+" "+aff[k]).join(" / ")+"</span></div>":"");
+}
+function renderHist(){
+ var s=state.server;if(!s)return $("panel-hist").innerHTML="<div class='mini'>拉取中……</div>";
+ $("panel-hist").innerHTML=(s.history&&s.history.length)?s.history.slice().reverse().map(h=>"<div><b>"+h.title+"</b></div><div class='mini' style='margin-bottom:8px;'>"+h.body+"</div>").join(""):"<div class='mini'>还没有重大历史</div>";
+}
+function renderTask(){
+ var s=state.server;if(!s)return $("panel-task").innerHTML="<div class='mini'>拉取中……</div>";
+ $("panel-task").innerHTML=(s.tasks&&s.tasks.length)?s.tasks.map(t=>"<div class='row'><span>"+(t.done?"✅":"⬜")+" "+t.title+"</span><span class='mini'>"+(t.done?"已完成":"进行中")+"</span></div>").join(""):"<div class='mini'>暂无任务</div>";
+}
+function renderMap(){
+ var s=state.server;if(!s||!s.map)return;
+ var locs=s.map.locations||[];var th=s.map.threats||[];var pts=[];
+ locs.forEach(l=>{if(l.coordinates)pts.push(l.coordinates);});
+ if(s.map.pos)pts.push(s.map.pos);
+ if(!pts.length){$("panel-map").innerHTML="<div class='mini'>地图暂无坐标数据</div>";return;}
+ var xs=pts.map(p=>p[0]),ys=pts.map(p=>p[1]);
+ var minX=Math.min(...xs),maxX=Math.max(...xs),minY=Math.min(...ys),maxY=Math.max(...ys);
+ var W=760,H=420,pad=46;
+ var rw=Math.max(maxX-minX,1),rh=Math.max(maxY-minY,1);
+ var sc=Math.min((W-2*pad)/rw,(H-2*pad)/rh);
+ var ox=pad+((W-2*pad)-rw*sc)/2,oy=pad+((H-2*pad)-rh*sc)/2;
+ function px(x){return ox+(x-minX)*sc;}
+ function py(y){return H-oy-(y-minY)*sc;}
+ $("panel-map").innerHTML="<canvas id='mapCanvas' width='"+W+"' height='"+(H+10)+"'></canvas>";
+ var cv=document.getElementById("mapCanvas"),ctx=cv.getContext("2d");
+ ctx.fillStyle="#15121c";ctx.fillRect(0,0,W,H+10);
+ locs.forEach(l=>{if(!l.coordinates)return;
+  var x=px(l.coordinates[0]),y=py(l.coordinates[1]);
+  var cur=(l.name===s.map.pos_name);
+  ctx.beginPath();ctx.arc(x,y,cur?8:5,0,Math.PI*2);
+  ctx.fillStyle=cur?"#d4af37":"#6fd08c";ctx.fill();
+  ctx.fillStyle="#c9c2dd";ctx.font="12px sans-serif";ctx.fillText(l.name,x+9,y+4);});
+ th.forEach(t=>{var c=null;
+  if(t.location){var m=t.location.match(/-?\d+(?:\.\d+)?\s*,\s*-?\d+(?:\.\d+)?/);
+   if(m){var sp=m[0].split(",");c=[parseFloat(sp[0]),parseFloat(sp[1])];}
+   else{var fl=locs.find(l=>l.name===t.location);if(fl&&fl.coordinates)c=fl.coordinates;}}
+  if(!c)return;var x=px(c[0]),y=py(c[1]);
+  ctx.beginPath();ctx.arc(x,y,6,0,Math.PI*2);ctx.fillStyle="#e05252";ctx.fill();
+  ctx.fillStyle="#e05252";ctx.font="11px sans-serif";ctx.fillText("!"+t.name,x+8,y+4);});
+ if(s.map.pos){var x=px(s.map.pos[0]),y=py(s.map.pos[1]);
+  ctx.beginPath();ctx.arc(x,y,8,0,Math.PI*2);ctx.fillStyle="#d4af37";ctx.fill();
+  ctx.strokeStyle="#fff";ctx.lineWidth=2;ctx.stroke();
+  ctx.fillStyle="#d4af37";ctx.font="bold 13px sans-serif";ctx.fillText("★队伍",x+11,y+5);}
+}
+function renderDice(){
+ $("panel-dice").innerHTML=
+  "<div class='row'><span>判定属性</span><select id='diceAttr'>"+ATTRS.map(a=>"<option>"+a+"</option>").join("")+"</select></div>"+
+  "<div class='row'><span>难度DC</span><input id='diceDc' type='number' value='18' style='width:80px'></div>"+
+  "<div style='text-align:center;margin:10px 0;'><button class='btn' onclick='rollUI()'>🎲 掷骰</button></div><div id='diceRes'></div>";
+}
+function roll(bonus,dc){var roll=1+Math.floor(Math.random()*30);var t=roll+bonus;var tier;
+ if(roll===30||t-dc>=10)tier="大成功";else if(t>=dc)tier="成功";else if(roll===1||dc-t>=10)tier="大失败";else tier="失败";return{roll:roll,total:t,tier:tier};}
+function rollUI(){
+ var attr=$("diceAttr").value,dc=parseInt($("diceDc").value)||18;
+ var bonus=(state.char.attributes[attr]||10)-10;
+ var r=roll(bonus,dc);
+ $("diceRes").innerHTML="<div class='dice'>"+r.roll+"</div><div style='text-align:center'>"+attr+"+"+bonus+" = <b>"+r.total+"</b> vs DC"+dc+"<br><span class='"+(r.tier==="大成功"?"epic":r.tier==="成功"?"ok":r.tier==="失败"?"":"bad")+" big'>"+r.tier+"</span></div>";
+ state.ops.push("判定 "+attr+" DC"+dc+"：骰面"+r.roll+"+"+bonus+"="+r.total+" → "+r.tier);save();
+}
+function refreshServer(){
+ if(!API)return;
+ fetch(API+"/api/plugin/astrbot_plugin_karol_trpg/state",{method:"POST",headers:{"Content-Type":"application/json"},
+  body:JSON.stringify({session:SESSION,player:PLAYER,token:TOKEN})}).then(r=>r.json()).then(d=>{
+   if(d.status==="ok"){state.server=d;
+    state.itemTypes=d.item_types||{};
+    state.shop=d.shop||[];
+    state.itemMeta=d.item_meta||{};
+    if(d.combat){var c=$("combatBanner");c.classList.remove("hidden");
+     c.innerHTML="⚔️ 战斗中："+d.combat.enemy+"（HP "+d.combat.hp+"/"+d.combat.max_hp+"）——回合数值由主模型结算，你可以在「判定」页掷骰。"}
+    else{$("combatBanner").classList.add("hidden");}
+    if(d.me&&state.char){state.char.hp=d.me.hp;state.char.max_hp=d.me.max_hp;state.char.mp=d.me.mp;state.char.max_mp=d.me.max_mp;
+     state.char.inventory=d.me.inventory||state.char.inventory;state.char.skills=d.me.skills||state.char.skills;
+     state.char.gold=d.me.gold;state.char.equipped=d.me.equipped||state.char.equipped;
+     save();renderAttr();renderBag();renderShop();}
+    $("metaBar").textContent="我："+state.char.name+" ｜ "+state.char.trait+" ｜ 金币 "+(state.char.gold||0)+" ｜ "+d.time+" @ "+(d.location||"未知");
+    if(d.event&&d.event.title){alert("【事件触发】"+d.event.title+"\n"+d.event.desc);}
+   }}).catch(()=>{});
+}
+function settle(){
+ if(!state.ops.length)return alert("还没有操作");
+ fetch(API+"/api/plugin/astrbot_plugin_karol_trpg/result",{method:"POST",headers:{"Content-Type":"application/json"},
+  body:JSON.stringify({session:SESSION,player:PLAYER,token:TOKEN,ops:state.ops})}).then(r=>r.json()).then(d=>{
+   if(d.status==="ok"){alert("✅ 已同步给主模型：\n"+d.message);state.ops=[];save();refreshServer();}
+   else{alert("❌ "+(d.detail||d.message||"结算失败"));}}).catch(e=>alert("❌ 网络错误："+e));
+}
+function recreate(){if(!confirm("重新创建角色？将清空当前角色数据（历史保留），需重新走一遍问卷"))return;state.ops.push("recreate");settle();localStorage.removeItem(LS);state.char=null;state.ops=[];startQuiz();}
+function restartGame(){if(!confirm("重新开始游戏？全队数据将被清空（角色链接保留）！"))return;state.ops.push("restart");settle();localStorage.removeItem(LS);state.char=null;state.ops=[];startQuiz();}
+boot();
+</script>
+</body>
+</html>
